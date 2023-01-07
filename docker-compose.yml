@@ -1,0 +1,56 @@
+version: "3.7"
+
+services:
+    rabbit:
+        image: rabbitmq:3-management-alpine
+        container_name: "rabbitmq"
+        ports:
+            - 5672:5672
+            - 15672:15672
+        hostname: rabbit
+        volumes:
+            - ./rabbitmq/advanced.config:/etc/rabbitmq/advanced.config
+        networks:
+            - rabbit_net
+    redis:
+        image: redis:6.2-alpine
+        restart: always
+        ports:
+        - '6379:6379'
+        command: redis-server --save 20 1 --loglevel warning --requirepass eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
+        volumes: 
+        - redis:/data
+        networks:
+            - rabbit_net
+    server:
+        build: server/
+        command: python ./consumer.py
+        depends_on:
+            - rabbit
+            - bot
+        environment:
+            AMQP_URL: 'amqp://guest:guest@rabbit:5672/?name=Server%20connection'
+        restart: on-failure
+        networks:
+            - rabbit_net
+    bot:
+        build: bot/
+        command: python ./bot.py
+        environment:
+            AMQP_URL: 'amqp://guest:guest@rabbit:5672/?name=Bot%20connection'
+            TOKEN: '5822952565:AAH9tX6qJUJYAtN8RjlntQ1gIyrPxD0vTFo'
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
+            REDIS_PASSWORD: eYVX7EwVmmxKPCDmwMtyKVge8oLd2t81
+        depends_on:
+            - redis
+            - rabbit
+        networks:
+            - rabbit_net
+        restart: on-failure
+networks:
+    rabbit_net:
+        driver: bridge
+volumes:
+    redis:
+        driver: local
