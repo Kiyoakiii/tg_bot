@@ -187,7 +187,7 @@ CrossEntropyLoss() можно использовать и при ```n_class = 2`
 Идеи которые можно было бы реализовать в будущем: 
 - подумать над умной нармализацией
 -  использовать ансамбли моделей
--  использовать каскады, например моедль которая по новостям предсказывает куда пойдет цена -> еще какая-то модель->...->...->...-> наша модель
+-  использовать каскады, например моедль которая по новостям предсказывает куда пойдет цена -> еще какая-то модель->...->...->...-> наша модель-> финальный предикт
 -  подумать над перебалансировкой. Как это повлияет на реальную практику. 
 ### Алгоритм торговли.
 
@@ -228,4 +228,57 @@ elif (price_current < price_buy  - 15) and (price_current < oredr_sell):
 Какие минусы: 
 - Если далеко от компьютера с программой и срочно нужно отключить алгоритм торговли, то нужно бежать к нему либо зайти в преложение binnace и поменять api ключи. 
 
+## Деплой 
+Деплой было решено делать в виде тг бота. Сразу проблема. Никакой дурак не скинет свой ```api_key и api_secret``` какому-то боту. Этот проект делается для нас и друзей так, что это +- ок.  В качетсве связующего звена между тг ботом и алгоритом торголви был выбран rabbitmq. Мы пытались это реализовать с помощью RPC. Но возникла проблема.  Функция  ```trading``` в  ```consumer.py``` может выполнять бескончено, например если пользователь укажет количество сделок = очень много. Но тогда rabbitmq  первет связь ```[error] <0.668.0> missed heartbeats from client, timeout: 60s``` это фиксится в конфиге:
+```
+[{rabbit, 
+    [{heartbeat, 0}]
+    }].
+```
+Но это не работает поэтому было принято решение обойтись без RPC и реализовать просто ```producer -> consumer ```. 
+Что касается message_handler. В ```bot.py``` ипсользуеются состояния, поэтому ```storage=MemoryStorage()```, не redis так как хранить в нем нечего + нагрузка на безопастность. Самое важно происходит тут:
+```python
+async def num_of_trades(state:FSMContext ,id: int, message: str, api_key: str, api_secret: str, num_trades: int, stop: bool) -> None:
+    binance_rpc = BinanceClient()
+    await binance_rpc.call(message, id, api_key, api_secret, num_trades, stop)
+    await state.finish()
+    
+@dp.message_handler(state=Gen.wait_for_input_num_of_trades)
+async def answer_on_input_num_of_trades(message: types.Message, state: FSMContext):
+    await state.finish()
+    await Gen.wait_for_answer.set()
+    await num_of_trades(state, message.from_user.id, message = 'BTCUSDT', api_key= api_key, api_secret=api_secret, num_trades = message['text'], stop=False)
+```
+Тут пользователь отправляет количество сделок, которые совершит бот. После чего ``` consumer ``` конектится к binence и начинает торговать, переодически сообщая ползователю о сделках. К сожалению функцию принудительной остановки торговли не получилось реализовать, некий /stop. 
 
+### Docker 
+Всего два docker. Один для бота другой для консьюмера(сервера). Тут ничего необычного. requirements.txt Загружаем -> устанавливаем все библиотеки. --no-cache-dir Для того чтобы докер образ был как можно меньше. 
+
+```
+FROM python:3.8
+
+WORKDIR /bot/
+
+ADD ./requirements.txt /bot/requirements.txt
+RUN apt-get update
+RUN pip install --no-cache-dir -r ./requirements.txt
+
+ADD . /bot/
+CMD ["python", "bot.py"]
+```
+Тут тоже все просто. Единственное, установка torch необходима отдельной командой. Так как в противном случае он установит не ту подборку что надо. Тут CPU просто потму что он меньше весит. Но в кончено если деплоить окончательно на сервак стоит поставить cuda gpu так как будет работать в раз 100 быстрее (выполнять предикт). + Загружаем модельку ранее обученую.  
+```
+FROM python:3.8 as builder
+
+WORKDIR /server/
+
+ADD ./requirements.txt /server/requirements.txt
+ADD ./model_weights_epochs_500.pth /server/model_weights_epochs_500.pth
+RUN apt-get update 
+RUN pip install --no-cache-dir torch==1.12.1+cpu torchvision==0.13.1+cpu torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir -r ./requirements.txt
+
+ADD . /server/
+CMD ["python", "consumer.py"]
+```
+### Docker compose
