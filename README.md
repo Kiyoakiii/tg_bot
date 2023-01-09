@@ -345,10 +345,12 @@ networks:
 
 На практике бот работает следующим образом. Запускаем ```docker consumer up ``` , все хорошо, теперь можно запускать бота. 
 
-![image](https://user-images.githubusercontent.com/113302248/211399087-7e5870da-39e0-44f7-a212-b94fe77cb63d.png  width="100")
+![image](https://user-images.githubusercontent.com/113302248/211399087-7e5870da-39e0-44f7-a212-b94fe77cb63d.png)
 ![image](https://user-images.githubusercontent.com/113302248/211399118-202ead12-900e-4005-9b12-a948a0450db2.png)
 ![image](https://user-images.githubusercontent.com/113302248/211399153-721b7823-91c8-47a3-989f-114023812917.png)
 ![image](https://user-images.githubusercontent.com/113302248/211399256-4cd35192-eabf-448f-b343-dbbd94ae3038.png)
+
+После чего бот виснит так как почему-то rabbit отключается и  не открывает соединения. НО в целом бот работает каждый новый раз после перезагрузки ```docker consumer ```
 
 
 
