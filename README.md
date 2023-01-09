@@ -282,3 +282,60 @@ ADD . /server/
 CMD ["python", "consumer.py"]
 ```
 ### Docker compose
+Я ранее ни разу не пытался написать что-то подобное. Данный синтаксис мне был не понятен, но через время стал более менее понятен. Первым делом обозначаем с какой версией python мы работаем. 3.7 - надежный выбор. Далее обозначаем все сервисы. Раньше их было 4. Но как не крути redis пока в данном проекте не нужен. 
+- rabbit: образ rabbitmq:3-management-alpine. Все работает надежно кроме того, что он отваливается хотя в конфиге прописано, что не должен отваливаться. Но самое главное он делает - доставляет количество сделок, которое должен совершить бот. 
+- server - это consumer.py, он же торговый алгоритм с ИИ. Принимает:
+        ```
+        params = {
+                        "user_id": id,
+                        "symbol": symbol,
+                        "api_key": api_key,
+                        "api_secret": api_secret,
+                        "num_trades": num_trades,
+                        "stop": stop
+                    }
+        ```
+
+
+```
+version: "3.7"
+
+services:
+    rabbit:
+        image: rabbitmq:3-management-alpine
+        container_name: "rabbitmq"
+        ports:
+            - 5672:5672
+            - 15672:15672
+        hostname: rabbit
+        volumes:
+            - ./rabbitmq/advanced.config:/etc/rabbitmq/advanced.config
+        networks:
+            - rabbit_net
+        restart: on-failure
+    server:
+        build: server/
+        command: python ./consumer.py
+        depends_on:
+            - rabbit
+            - bot
+        environment:
+            AMQP_URL: 'amqp://guest:guest@rabbit:5672/?name=Server%20connection'
+        restart: on-failure
+        networks:
+            - rabbit_net
+    bot:
+        build: bot/
+        command: python ./bot.py
+        environment:
+            AMQP_URL: 'amqp://guest:guest@rabbit:5672/?name=Bot%20connection'
+            TOKEN: '5822952565:AAH9tX6qJUJYAtN8RjlntQ1gIyrPxD0vTFo'
+        depends_on:
+            - rabbit
+        networks:
+            - rabbit_net
+        restart: on-failure
+networks:
+    rabbit_net:
+        driver: bridge
+```
