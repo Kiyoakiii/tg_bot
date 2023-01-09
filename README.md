@@ -66,4 +66,77 @@ for i in range (len(df['Open'])):
 
 ### Processing data
 
+Необходимо получить индикаторы из того, что есть. 
+
+Какие индикаторы используем?
+
+Вот такие:
+
+```python
+# Commodity Channel Index 
+def CCI(data, ndays): 
+    TP = (data['High'] + data['Low'] + data['Close']) / 3 
+    CCI = pd.Series((TP - TP.rolling(ndays).mean()) / (0.015 * TP.rolling(ndays).std()), name = 'CCI') 
+    data = data.join(CCI) 
+    return data
+
+# Ease of Movement 
+def EVM(data, ndays): 
+    dm = ((data['High'] + data['Low'])/2) - ((data['High'].shift(1) + data['Low'].shift(1))/2)
+    br = (data['Volume'] / 100000000) / ((data['High'] - data['Low']))
+    EVM = dm / br 
+    EVM_MA = pd.Series(EVM.rolling(ndays).mean(), name = 'EVM') 
+    data = data.join(EVM_MA) 
+    return data 
+
+# Simple Moving Average 
+def SMA(data, ndays): 
+    SMA = pd.Series(data['Close'].rolling(ndays).mean(), name = 'SMA') 
+    data = data.join(SMA) 
+    return data
+
+# Exponentially-weighted Moving Average 
+def EWMA(data, ndays): 
+    EMA = pd.Series(data['Close'].ewm(span = ndays, min_periods = ndays - 1).mean(), 
+                    name = 'EWMA_' + str(ndays)) 
+    data = data.join(EMA) 
+    return data
+
+def BBANDS(data, window):
+    MA = data.Close.rolling(window).mean()
+    SD = data.Close.rolling(window).std()
+    data['UpperBB'] = MA + (2 * SD) 
+    data['LowerBB'] = MA - (2 * SD)
+    return data
+
+# Force Index 
+def ForceIndex(data, ndays): 
+    FI = pd.Series(data['Close'].diff(ndays) * data['Volume'], name = 'ForceIndex') 
+    data = data.join(FI) 
+    return data 
+
+# Rate of Change (ROC)
+def ROC(data,n):
+    N = data['Close'].diff(n)
+    D = data['Close'].shift(n)
+    ROC = pd.Series(N/D,name='Rate of Change')
+    data = data.join(ROC)
+    return data 
+```
+
+Почему их? Потому что каждый из них выглядит логично. По сути это комбинации стратегий торговли. В файле тренировки модели есть графики с этими индикаторами. 
+
+#### Нормализация данных. 
+
+Нормализуем данные. Это нужно для того чтобы модель могла понять, что делать если вдруг цена на входе упадет на 100 и станет равная условно 14900, в тренировачном наборе данных такого может не быть поэтому номарлизуем чтоб предотвратить это. Этот  
+
+```prolog
+d = preprocessing.normalize(X_train, axis=0)
+X_train = pd.DataFrame(d, columns=X_train.columns)
+```
+#### Выбор модели
+До этого проекта я не работал с временными рядами, а в процессеобучения в deep learning school от МФТИ + mlcourse.ai не уделял должного внимания временным рядам. Но я всегда знал про lstm и что они хорошо справляются с времеными рядами. 
+
+!Важно отметить, что не получилось релаизовать в данном разделе.
+
 
