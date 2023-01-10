@@ -24,7 +24,7 @@
 #### Training
 
 У Binance есть API(со своей документацией). Было решено использовать данные начиная с "16 Jun,2022". Нам нужны только ```
-['open_time','open', 'high', 'low', 'close', 'volume', 'qav','num_trades']``` поэтому остальное дропаем, а файле data preprocessing.ipynb.
+['open_time','open', 'high', 'low', 'close', 'volume', 'qav','num_trades']``` поэтому остальное дропаем, в файле data preprocessing.ipynb.
 
 ```python
 import pandas as pd
